@@ -1,31 +1,51 @@
-#include "proj4.h"
+#include "proj5.h"
+#define MAXUSERS 18
 
 int pcbid;	// Shared memory ID of process control block table
-int clockid;	// Shared memory ID of simulated system clock
+int clkid;	// Shared memory ID of simulated system clock
 int msgid;	// Message queue ID
+int semid;	// Semaphore ID
 FILE *fp;	// Log file
 
+void outputTable();
+
 void handler(int signo) {
-	if (signo == SIGINT) {
-		shmctl(pcbid, IPC_RMID, NULL);		// Release process control block memeory
-		shmctl(clockid, IPC_RMID, NULL);	// Release simulated system clock memory
-		msgctl(msgid, IPC_RMID, NULL);		// Release message queue memory
-		fclose(fp);
-	}
-	printf("OSS: Terminated by signal\n");
+	printf("OSS: Terminating by signal\n");
+	shmctl(clkid, IPC_RMID, NULL);	// Release simulated system clock memory
+/*	msgctl(msgid, IPC_RMID, NULL);		// Release message queue memory
+	fclose(fp);
+*/
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+
+	//Parse command line options:
+	int opt;
+	int vflag = 0;
+	while ((opt = getopt(argc, argv, "v")) != -1) {
+		switch (opt) {
+			case 'v':
+				// Set -h flag
+				vflag = 1;
+				break;
+		}
+	}
+	
+	if (vflag) {
+		outputTable();
+	}
+
+
 	// Initialize signal handlers
 	signal(SIGINT, handler);
 	signal(SIGALRM, handler);
+	alarm(2);
 
-	// Pointer(s) to shared memory
-	pcb *pcbTable;
-
-	// Message queue
+	int currentUsers;
+	int pid;	
+	sim_time *simClock;
 	message_buf buf;
-	size_t buf_length;
+	size_t buf_length;	
 
 	// Open log file for output
 	fp = fopen("data.log", "w");
@@ -34,22 +54,32 @@ int main() {
 		exit(1);
 	}
 
-// Setup IPC
+	// Allocate shared memory for system structures
 
-	// Create memory segment for process control table
+	// Create clock in shared memory
+	if ((clkid = shmget(CLKKEY, sizeof(sim_time), IPC_CREAT | 0666)) < 0 ) {
+		perror("oss: shmget");
+		exit(1);
+	}
+	simClock = shmat(clkid, NULL, 0);
+	simClock->sec = 0;
+	simClock->nano = 0;
+
+	// Create resource descriptors in shared
+
+/*	// Create memory segment for process control table
 	if ((pcbid = shmget(PCBKEY, SIZE*sizeof(pcbTable), IPC_CREAT | 0666)) < 0 ) {
 		perror("oss: pcbid");
 		exit(1);
 	}
 	pcbTable = shmat(pcbid, NULL, 0);
 
+
 	// Create message queue
 	if ((msgid = msgget(MSGKEY, IPC_CREAT | 0666)) < 0) {
 		perror("oss: msgget");
 		exit(1);
 	}
-
-// Main loop
 
 	// fork/execl child
 	if ((pid = fork()) == 0) {
@@ -66,10 +96,29 @@ int main() {
 		error("oss: msgsend");
 		exit(1);
 	}
-
-	shmctl(pcbid, IPC_RMID, NULL); // Release process control block memeory
+*/
+	shmctl(clkid, IPC_RMID, NULL); // Release process control block memeory
 	msgctl(msgid, IPC_RMID, NULL); // Release message queue memory
 	fclose(fp);
 
 	return 0;
+}
+
+void outputTable() {
+	int i, j;
+	for (i = -1; i < SIZE; i++) {
+		if (i < 0) {
+			printf("\t");
+			for (j = 0; j < SIZE; j++) {
+				printf("R%d\t", j);
+			}
+		}
+		else {
+			printf("P%d\t", i);
+			for (j = 0; j < SIZE; j++) {
+				printf("%d\t", (i * SIZE + j));
+			}
+		}
+		printf("\n");
+	}
 }

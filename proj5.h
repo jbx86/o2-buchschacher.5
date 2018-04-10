@@ -6,31 +6,24 @@
 #include <sys/shm.h>
 #include <string.h>
 
+#define SEMKEY 2424
 #define PCBKEY 1077
 #define CLKKEY 1138
 #define MSGKEY 4242
 #define MSGSZ 256
 #define NPS 1000000000
-#define SIZE 18
+#define SIZE 20
 
 typedef struct {
-	int sec;
-	int nano;
+	unsigned int sec;
+	unsigned int nano;
 } sim_time;
 
 typedef struct {
-	pid_t pid;
-	sim_time arrival;
-	sim_time cpuTimeUsed;
-	sim_time runtime;
-	int lastburst;
-	int queue;
-	int timeslice;
-	int termFlag;
-	int suspFlag;
-	int seed;
-	int simpid;
-} pcb;
+	int type;
+	int instances;
+	int allocated;	
+} resource;
 
 typedef struct msgbuf {
 	long mtype;
@@ -38,15 +31,16 @@ typedef struct msgbuf {
 } message_buf;
 
 // Add a number of nanoseconds to a sim_time
-void simadd(sim_time *time, int increment) {
-	if (increment < 0) {
+void simadd(sim_time *time, unsigned int incSec, unsigned int incNano) {
+	if ((incSec < 0) || (incNano < 0)) {
 		fprintf(stderr, "simadd error: function cannot be called with a negative increment\n");
 		exit(1);
 	}
-	
-	time->nano += increment;
-	
-	if (time->nano >= NPS) {
+
+	time->sec += incSec;	
+	time->nano += incNano;
+
+	while (time->nano >= NPS) {
 		time->sec += (time->nano / NPS);
 		time->nano = (time->sec % NPS);
 	}
@@ -76,8 +70,4 @@ int pctToBit(int roll, int percent) {
 	if ((roll % 100) < percent)
 		return 1;
 	return 0;
-}
-
-void printBlock(int i, pcb a) {
-	printf("Block %d:\n\tPID: %ld\n\tPriority: %d\n\tArrival: %d.%09d\n", i, a.pid, a.queue, a.arrival.sec, a.arrival.nano);
 }

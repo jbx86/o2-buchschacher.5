@@ -1,8 +1,8 @@
 // user.c
-#include "proj4.h"
+#include "proj5.h"
 
 int main() {
-	int pcbShmid;		// Shared memory ID of process control block table
+/*	int pcbShmid;		// Shared memory ID of process control block table
 	int clkShmid;		// Shared memory ID of simclock
 	int msgShmid;		// Message queue ID
 
@@ -52,6 +52,6 @@ int main() {
 		perror("user: msgsend");
 		exit(1);
 	}
-
+*/
 	exit(0);
 }
