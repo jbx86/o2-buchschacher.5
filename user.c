@@ -2,12 +2,14 @@
 #include "proj5.h"
 
 int main() {
-/*	int pcbShmid;		// Shared memory ID of process control block table
-	int clkShmid;		// Shared memory ID of simclock
-	int msgShmid;		// Message queue ID
+	printf("Child!\n");
+//	int pcbShmid;		// Shared memory ID of process control block table
+	int clkid;		// Shared memory ID of simclock
+	int msgid;		// Message queue ID
 
-	pcb *pcbTable;		// Pointer to table of process control blocks
-	sim_time *ossClock;	// Pointer to simulated system clock
+
+//	pcb *pcbTable;		// Pointer to table of process control blocks
+//	sim_time *ossClock;	// Pointer to simulated system clock
 	message_buf buf;	// Message buffer
 	size_t buf_length;	// Length of send message buffer
 
@@ -15,28 +17,39 @@ int main() {
 
 // Setup IPC
 
-	// Locate shared process control table
-	if ((pcbShmid = shmget(PCBKEY, SIZE*sizeof(pcbTable), 0666)) < 0 ) {
-		perror("user: shmget pcbShmid");
-		exit(1);
-	}
-	pcbTable = shmat(pcbShmid, NULL, 0);
-
 	// Locate shared simulated system clock
-	if ((clkShmid = shmget(CLKKEY, sizeof(sim_time), 0666)) < 0 ) {
-		perror("user: shmget clkShmid");
+	if ((clkid = shmget(CLKKEY, sizeof(sim_time), 0666)) < 0 ) {
+		perror("user: shmget clkid");
 		exit(1);
 	}
-	ossClock = shmat(clkShmid, NULL, 0);
+	sim_time *ssClock = shmat(clkid, NULL, 0);
 
 	// Locate message queue
-	if ((msgShmid = msgget(MSGKEY, 0666)) < 0) {
-		perror("user: shmget msgShmid");
+	if ((msgid = msgget(MSGKEY, 0666)) < 0) {
+		perror("user: shmget msgid");
 		exit(1);
 	}
 
-// Main loop
+	for (i = 0; i < 3; i++) {
+		printf("user: sleeping...\n");
+		sleep(1);
+	}
 
+	// Send a message
+	buf.mtype = 1;
+	sprintf(buf.mtext, "User is ready");
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("user: msgsnd");
+		exit(1);
+	}
+
+
+
+
+
+// Main loop
+/*
 	// Wait on message from OSS
 	printf("%d: Waiting for message\n", pcbTable[myPid].simpid);
 	if (msgrcv(msgShmid, &buf, MSGSZ, myPid + 1, 0) < 0) {

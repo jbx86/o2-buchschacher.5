@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define SEMKEY 2424
-#define PCBKEY 1077
+#define DESCKEY 1077
 #define CLKKEY 1138
 #define MSGKEY 4242
 #define MSGSZ 256
