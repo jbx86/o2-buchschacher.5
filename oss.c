@@ -13,6 +13,7 @@ void handler(int signo) {
 	printf("OSS: Terminating by signal\n");
 	shmctl(clkid, IPC_RMID, NULL);	// Release simulated system clock memory
 	shmctl(descid, IPC_RMID, NULL);	// Release resource description memory
+	msgctl(msgid, IPC_RMID, NULL);	// Release message queue
 	fclose(fp);
 	exit(1);
 }
@@ -21,12 +22,13 @@ int main(int argc, char *argv[]) {
 
 	// getopt() vars
 	int opt;
-	int vflag = 0;
+	int vflag;
 	
 	// Child tracking vars
 	int currentUsers = 0;
 	const int maxUsers = 5;
 	pid_t pid;
+	pid_t pidTable[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	sim_time *simClock;	// Pointer to simulated clock in shared memeory
 	resource *resDesc;	// Pointer to resource descriptor array in chared memeory
@@ -37,9 +39,11 @@ int main(int argc, char *argv[]) {
 	while ((opt = getopt(argc, argv, "v")) != -1) {
 		switch (opt) {
 			case 'v':
-				// Set -h flag
+				// Run in verbose mode
 				vflag = 1;
 				break;
+			default:
+				vflag = 0;
 		}
 	}
 	if (vflag) {
@@ -47,20 +51,20 @@ int main(int argc, char *argv[]) {
 	}
 
 	signal(SIGINT, handler);	// Catch interupt signal
-//	signal(SIGALRM, handler);	// Catch alarm signal
-//	alarm(2);			// Send alarm signal after 2 seconds of realtime
+	signal(SIGALRM, handler);	// Catch alarm signal
+	alarm(5);			// Send alarm signal after 2 seconds of realtime
 
 	// Open log file for output
 	fp = fopen("data.log", "w");
 	if (fp == NULL) {
 		fprintf(stderr, "Can't open file\n");
-		exit(1);
+		raise(SIGINT);
 	}
 
 	// Create clock in shared memory
 	if ((clkid = shmget(CLKKEY, sizeof(sim_time), IPC_CREAT | 0666)) < 0 ) {
 		perror("oss: shmget");
-		exit(1);
+		raise(SIGINT);
 	}
 	simClock = shmat(clkid, NULL, 0);
 	simClock->sec = 0;
@@ -69,21 +73,49 @@ int main(int argc, char *argv[]) {
 	// Create resource descriptors in shared
 	if ((descid = shmget(DESCKEY, 20*sizeof(resource), IPC_CREAT | 0666)) < 0) {
 		perror("oss: shmget");
-		exit(1);
+		raise(SIGINT);
 	}
 	resDesc = shmat(descid, NULL, 0);
 
 	// Create message queue
 	if ((msgid = msgget(MSGKEY, IPC_CREAT | 0666)) < 0) {
 		perror("oss: msgget");
-		exit(1);
+		raise(SIGINT);
 	}
 
 
-	if ((pid = fork()) == 0) {
-		execl("./user", "user", NULL);
-		fprintf(stderr, "Fail to execute child process\n");
-		exit(1);
+
+
+	// Infinitely repeated loop
+	while(1) {
+
+		// Fork children if max has not been reached
+		if (currentUsers < MAXUSERS) {
+			pid = fork();
+			switch (pid) {
+				case -1 :
+					printf("Could not spawn child");
+					break;
+				case 0 :
+					execl("./user", "user", NULL);
+					fprintf(stderr, "Fail to execute child process\n");
+					exit(1);
+				default :
+					currentUsers++;
+					printf("OSS: %d users spawned\n", currentUsers);
+			}
+		}
+
+		// Handle messages from children
+		if (msgrcv(msgid, &buf, MSGSZ, 0, IPC_NOWAIT) != (ssize_t)-1) {
+			char usermsg[MSGSZ];
+			sprintf(usermsg, "%s", buf.mtext);
+		//	fprintf(fp, "%s from %ld\n", buf.mtext, (long)buf.spid);
+			fprintf(fp, "Master detected %d is %s\n", buf.mtype, usermsg);
+			if (strcmp(usermsg, "requesting resource R5") == 0) {
+				printf("Match!\n");
+			} 
+		}
 	}
 
 
@@ -100,14 +132,14 @@ int main(int argc, char *argv[]) {
 
 //	printf("buf.mtype = %d\nbuf_length = %d\nbuf_mtext = %s\n", buf.mtype, buf_length, buf.mtext);
 
-
+/*
 	// Repeatedly wait for a type 1 message in the queue
 	while(msgrcv(msgid, &buf, MSGSZ, 1, IPC_NOWAIT) == (ssize_t)-1) {
 		printf("OSS: No message in queue\n");
 		sleep(1);
 	}
 	printf("recieved \'%s\'\n", buf.mtext);
-
+*/
 
 /*	if (msgrcv(msgid, &buf, MSGSZ, 1, IPC_NOWAIT) < 0) {
 		perror("msgrcv");
@@ -143,11 +175,10 @@ int main(int argc, char *argv[]) {
 		
 	}
 */
-
-	printf("OSS: DONE\n");
+	printf("OSS: DONE ------------------------------------\n");
 	shmctl(clkid, IPC_RMID, NULL);	// Release process control block memeory
-	msgctl(msgid, IPC_RMID, NULL);	// Release message queue memory
 	shmctl(descid, IPC_RMID, NULL);	// Release resource description memory
+	msgctl(msgid, IPC_RMID, NULL);  // Release message queue memory
 	fclose(fp);
 
 	return 0;
@@ -155,7 +186,7 @@ int main(int argc, char *argv[]) {
 
 void outputTable() {
 	int i, j;
-	for (i = -1; i < SIZE; i++) {
+	for (i = -1; i < MAXUSERS; i++) {
 		if (i < 0) {
 			printf("\t");
 			for (j = 0; j < SIZE; j++) {
@@ -163,7 +194,7 @@ void outputTable() {
 			}
 		}
 		else {
-			printf("P%d\t", i);
+			printf("P%02d\t", i);
 			for (j = 0; j < SIZE; j++) {
 				printf("%d\t", (i * SIZE + j));
 			}

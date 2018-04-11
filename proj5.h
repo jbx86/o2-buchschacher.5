@@ -13,6 +13,7 @@
 #define MSGSZ 256
 #define NPS 1000000000
 #define SIZE 20
+#define MAXUSERS 18
 
 typedef struct {
 	unsigned int sec;
