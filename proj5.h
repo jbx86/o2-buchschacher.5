@@ -5,6 +5,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <string.h>
+#include <limits.h>
 
 #define SEMKEY 2424
 #define DESCKEY 1077

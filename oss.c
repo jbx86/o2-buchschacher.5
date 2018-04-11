@@ -108,13 +108,27 @@ int main(int argc, char *argv[]) {
 
 		// Handle messages from children
 		if (msgrcv(msgid, &buf, MSGSZ, 0, IPC_NOWAIT) != (ssize_t)-1) {
-			char usermsg[MSGSZ];
-			sprintf(usermsg, "%s", buf.mtext);
-		//	fprintf(fp, "%s from %ld\n", buf.mtext, (long)buf.spid);
-			fprintf(fp, "Master detected %d is %s\n", buf.mtype, usermsg);
-			if (strcmp(usermsg, "requesting resource R5") == 0) {
-				printf("Match!\n");
-			} 
+			// Parse message
+			char *ptr;
+			long int userPid;
+			long int resourceNo;
+			
+			userPid = strtol(buf.mtext, &ptr, 10);
+			resourceNo = strtol(ptr, &ptr, 10);
+
+			printf("Message type %ld recieved from %ld regarding %ld\n", buf.mtype, userPid, resourceNo);
+
+			// Send kill signal to user
+			buf.mtype = userPid;
+			sprintf(buf.mtext, "Okay");
+			buf_length = strlen(buf.mtext) + 1;
+			if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+				perror("oss: msgsnd");
+				exit(1);
+			}
+			wait(NULL);
+			currentUsers--;
+			
 		}
 	}
 

@@ -2,17 +2,16 @@
 #include "proj5.h"
 
 int main() {
-	printf("Child!\n");
-//	int pcbShmid;		// Shared memory ID of process control block table
 	int clkid;		// Shared memory ID of simclock
 	int msgid;		// Message queue ID
 
-
-//	pcb *pcbTable;		// Pointer to table of process control blocks
 	sim_time *ossClock;	// Pointer to simulated system clock
 	message_buf buf;	// Message buffer
 	size_t buf_length;	// Length of send message buffer
 
+	long int mypid = (long)getpid();
+	srand((time(NULL) + mypid) % UINT_MAX);
+	printf("%ld is alive and generated %d\n", mypid, rand() % 20);
 	int i;
 
 // Setup IPC
@@ -30,16 +29,22 @@ int main() {
 		exit(1);
 	}
 
-	// Send a message
-	buf.mtype = (long)getpid();
-	sprintf(buf.mtext, "requesting resource R5");
+	// Send a message to OSS
+	buf.mtype = 1;
+	sprintf(buf.mtext, "%ld %d", mypid, rand() % 20);
 	buf_length = strlen(buf.mtext) + 1;
 	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
 		perror("user: msgsnd");
 		exit(1);
 	}
 
+	// Wait for responce from OSS
+	if (msgrcv(msgid, &buf, MSGSZ, mypid, 0) < 0) {
+		perror("user: msgrcv");
+		exit(1);
+	}
 
+	printf("%ld is terminating\n", mypid);
 
 	exit(0);
 }
