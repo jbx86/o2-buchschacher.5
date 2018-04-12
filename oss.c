@@ -92,13 +92,13 @@ int main(int argc, char *argv[]) {
 		raise(SIGINT);
 	}
 
-	//outputTable();
+	outputTable();
 	//exit(0);
 
 
 // Infinitely repeated loop
 
-	while(1) {
+	while(totalUsers < 30) {
 
 		// Fork children if max has not been reached
 		if (currentUsers < MAXUSERS) {
@@ -120,6 +120,8 @@ int main(int argc, char *argv[]) {
 					totalUsers++;
 					currentUsers++;
 					printf("Creating P%d (PID: %ld)\n", procNum, pid);
+					pidTable(P);
+
 			}
 		}
 
@@ -141,9 +143,10 @@ int main(int argc, char *argv[]) {
 			// Handle message
 			switch (msgType) {
 				case TERM:
-					printf("P%d is terminating\n", procNum);
+					//printf("P%d is terminating\n", procNum);
 					waitpid(P[procNum], NULL, 0);
 					P[procNum] = 0;
+					pidTable(P);
 					currentUsers--;
 					break;
 				case REQ:
@@ -174,25 +177,30 @@ int main(int argc, char *argv[]) {
 	msgctl(msgid, IPC_RMID, NULL);  // Release message queue memory
 	fclose(fp);
 
-	return 0;
+	exit(0);
 }
 
+
+// Write formated table to log file
 void outputTable() {
 	int procNum, rsrcNum;
 	for (procNum = -1; procNum < MAXUSERS; procNum++) {
+
 		if (procNum < 0) {
-			printf("\t");
+			fprintf(fp, "\t");
 			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
-				printf("R%d\t", rsrcNum);
+				fprintf(fp, "R%d\t", rsrcNum);
 			}
 		}
 		else {
-			printf("P%d\t", procNum);
+			fprintf(fp, "P%d\t", procNum);
 			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
-				printf("%d\t", (procNum * SIZE + rsrcNum));
+				//fprintf(fp, "%d\t", (procNum * SIZE + rsrcNum));
+				fprintf(fp, "%d\t", 0);
 			}
 		}
-		printf("\n");
+	
+		fprintf(fp, "\n");
 	}
 }
 
@@ -227,4 +235,16 @@ void unblock(pid_t userPid) {
 		perror("oss: msgsnd");
 		exit(1);
 	}
+}
+
+void pidTable(pid_t P[]) {
+	system("ps");
+	int procNum;
+	printf("[");
+	for (procNum = 0; procNum < MAXUSERS; procNum++) {
+		if (procNum != 0)
+			printf(" , ");
+		printf("%5ld", (long)P[procNum]);
+	}
+	printf("]\n");
 }

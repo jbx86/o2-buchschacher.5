@@ -1,18 +1,6 @@
-Master has detected Process P0 requesting R1 at time 0:000000000
-Master has detected Process P13 requesting R1 at time 0:000000000
-Master has detected Process P6 requesting R1 at time 0:000000000
-Master has detected Process P1 requesting R1 at time 0:000000000
-Master has detected Process P15 requesting R1 at time 0:000000000
-Master has detected Process P17 requesting R1 at time 0:000000000
-Master has detected Process P16 requesting R1 at time 0:000000000
-Master has detected Process P11 requesting R1 at time 0:000000000
-Master has detected Process P13 requesting R1 at time 0:000000000
-Master has detected Process P9 requesting R1 at time 0:000000000
-Master has detected Process P8 requesting R1 at time 0:000000000
-Master has detected Process P15 requesting R1 at time 0:000000000
-Master has detected Process P13 requesting R1 at time 0:000000000
-Master has detected Process P8 requesting R1 at time 0:000000000
-Master has detected Process P14 requesting R1 at time 0:000000000
-Master has detected Process P8 requesting R1 at time 0:000000000
-Master has detected Process P14 requesting R1 at time 0:000000000
-Master has detected Process P8 requesting R1 at time 0:000000000
+	R0	R1	R2	R3	R4	R5	R6	R7	R8	R9	R10	R11	R12	R13	R14	R15	R16	R17	R18	R19	
+P0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	
+P1	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	
+P2	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	
+P3	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	
+P4	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	

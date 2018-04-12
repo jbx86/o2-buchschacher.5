@@ -45,7 +45,7 @@ int main() {
 	int msgType = (int)strtol(ptr, &ptr, 10);
 	int msgData = (int)strtol(ptr, &ptr, 10);
 
-	printf("%ld: recieved Resource R%d\n", (long)getpid(), msgData);
+	//printf("%ld: recieved Resource R%d\n", (long)getpid(), msgData);
 
 
 	/*

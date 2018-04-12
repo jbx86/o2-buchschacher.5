@@ -14,7 +14,7 @@
 #define MSGKEY 4242
 #define MSGSZ 256
 #define NPS 1000000000
-#define MAXUSERS 18
+#define MAXUSERS 5
 #define SIZE 20
 
 #define REQ 1
