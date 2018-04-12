@@ -26,7 +26,8 @@ int main(int argc, char *argv[]) {
 	
 	// Child tracking vars
 	int currentUsers = 0;
-	const int maxUsers = 5;
+	int totalUsers = 0;
+	long int ossPid = (long)getpid();
 	pid_t pid;
 	pid_t pidTable[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -94,41 +95,40 @@ int main(int argc, char *argv[]) {
 			pid = fork();
 			switch (pid) {
 				case -1 :
-					printf("Could not spawn child");
+					printf("Could not spawn child\n");
 					break;
 				case 0 :
 					execl("./user", "user", NULL);
 					fprintf(stderr, "Fail to execute child process\n");
 					exit(1);
 				default :
+					totalUsers++;
 					currentUsers++;
-					printf("OSS: %d users spawned\n", currentUsers);
+					printf("OSS: %d users spawned\n", totalUsers);
 			}
 		}
 
 		// Handle messages from children
-		if (msgrcv(msgid, &buf, MSGSZ, 0, IPC_NOWAIT) != (ssize_t)-1) {
+		if (msgrcv(msgid, &buf, MSGSZ, ossPid, IPC_NOWAIT) != (ssize_t)-1) {
+
 			// Parse message
 			char *ptr;
-			long int userPid;
-			long int resourceNo;
+			long int userPid = strtol(buf.mtext, &ptr, 10);
+			long int msgType = strtol(ptr, &ptr, 10);
+			long int msgData = strtol(ptr, &ptr, 10);
+			printf("Message type %ld recieved from %ld regarding %ld\n", msgType, userPid, msgData);
 			
-			userPid = strtol(buf.mtext, &ptr, 10);
-			resourceNo = strtol(ptr, &ptr, 10);
 
-			printf("Message type %ld recieved from %ld regarding %ld\n", buf.mtype, userPid, resourceNo);
-
-			// Send kill signal to user
-			buf.mtype = userPid;
-			sprintf(buf.mtext, "Okay");
-			buf_length = strlen(buf.mtext) + 1;
-			if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
-				perror("oss: msgsnd");
-				exit(1);
+			// Process message
+			switch (msgType) {
+				case 0:
+					printf("OSS: %ld is terminating\n", userPid);
+					waitpid((pid_t)userPid, NULL, 0);
+					currentUsers--;
 			}
-			wait(NULL);
-			currentUsers--;
-			
+			// Respond to user
+
+
 		}
 	}
 

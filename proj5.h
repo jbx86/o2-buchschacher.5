@@ -6,6 +6,7 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <limits.h>
+#include <sys/wait.h>
 
 #define SEMKEY 2424
 #define DESCKEY 1077

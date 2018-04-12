@@ -1,5 +1,6 @@
 // user.c
 #include "proj5.h"
+#define RNDBND 20
 
 int main() {
 	int clkid;		// Shared memory ID of simclock
@@ -9,9 +10,10 @@ int main() {
 	message_buf buf;	// Message buffer
 	size_t buf_length;	// Length of send message buffer
 
-	long int mypid = (long)getpid();
-	srand((time(NULL) + mypid) % UINT_MAX);
-	printf("%ld is alive and generated %d\n", mypid, rand() % 20);
+	long int ossPid = (long)getppid();
+	long int userPid = (long)getpid();
+	srand((time(NULL) + userPid) % UINT_MAX);
+//	printf("%ld is alive and generated %d\n", userPid, rand() % 20);
 	int i;
 
 // Setup IPC
@@ -29,22 +31,41 @@ int main() {
 		exit(1);
 	}
 
+	
+/*
 	// Send a message to OSS
-	buf.mtype = 1;
-	sprintf(buf.mtext, "%ld %d", mypid, rand() % 20);
+	buf.mtype = ossPid;
+	sprintf(buf.mtext, "%ld %d", userPid, rand() % 20);
 	buf_length = strlen(buf.mtext) + 1;
 	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
 		perror("user: msgsnd");
 		exit(1);
 	}
 
+/*
 	// Wait for responce from OSS
-	if (msgrcv(msgid, &buf, MSGSZ, mypid, 0) < 0) {
+	if (msgrcv(msgid, &buf, MSGSZ, userPid, 0) < 0) {
 		perror("user: msgrcv");
 		exit(1);
 	}
 
-	printf("%ld is terminating\n", mypid);
+	printf("%ld is terminating\n", userPid);
+*/
+
+// User 
+
+	// Release resources
+
+	// Tell OSS this process is terminating
+	buf.mtype = ossPid;
+	sprintf(buf.mtext, "%ld %d %d", userPid, 0, 0);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("user: msgsnd");
+		exit(1);
+	}
+
+
 
 	exit(0);
 }
