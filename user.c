@@ -38,9 +38,18 @@ int main() {
 
 // Send a few random messages
 	request(1);
-	release(88);
 
-	while (termFlag == 0) {
+	msgrcv(msgid, &buf, MSGSZ, (long)getppid(), 0);
+	char *ptr;
+	pid_t userPid = (pid_t)strtol(buf.mtext, &ptr, 10);
+	int msgType = (int)strtol(ptr, &ptr, 10);
+	int msgData = (int)strtol(ptr, &ptr, 10);
+
+	printf("%ld: recieved Resource R%d\n", (long)getpid(), msgData);
+
+
+	/*
+	while (termFlag == 1) {
 	
 		// Handle messages from oss
 		if (msgrcv(msgid, &buf, MSGSZ, (long)getppid(), IPC_NOWAIT) != (ssize_t)-1) {
@@ -67,8 +76,10 @@ int main() {
 				// Respond to user
 
 
-			}
+		}
+
 	}
+	*/
 	
 	terminate();
 	exit(0);

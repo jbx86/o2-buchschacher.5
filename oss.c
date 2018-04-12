@@ -27,6 +27,7 @@ void handler(int signo) {
 
 int main(int argc, char *argv[]) {
 	int procNum;
+	int logWrite = 0;
 
 	// getopt() vars
 	int opt;
@@ -36,7 +37,7 @@ int main(int argc, char *argv[]) {
 	int currentUsers = 0;
 	int totalUsers = 0;
 
-	pid_t ossPid = getpid();
+	//pid_t ossPid = getpid();
 	pid_t pid;
 	pid_t P[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -91,7 +92,8 @@ int main(int argc, char *argv[]) {
 		raise(SIGINT);
 	}
 
-
+	//outputTable();
+	//exit(0);
 
 
 // Infinitely repeated loop
@@ -117,12 +119,12 @@ int main(int argc, char *argv[]) {
 					P[procNum] = pid;
 					totalUsers++;
 					currentUsers++;
-					printf("Creating P%2d (PID: %ld)\n", procNum, pid);
+					printf("Creating P%d (PID: %ld)\n", procNum, pid);
 			}
 		}
 
 		// Handle messages from children
-		if (msgrcv(msgid, &buf, MSGSZ, (long)ossPid, IPC_NOWAIT) != (ssize_t)-1) {
+		if (msgrcv(msgid, &buf, MSGSZ, (long)getpid(), IPC_NOWAIT) != (ssize_t)-1) {
 
 			// Parse message
 			char *ptr;
@@ -139,16 +141,17 @@ int main(int argc, char *argv[]) {
 			// Handle message
 			switch (msgType) {
 				case TERM:
-					printf("P%2d is terminating\n", procNum);
+					printf("P%d is terminating\n", procNum);
 					waitpid(P[procNum], NULL, 0);
 					P[procNum] = 0;
 					currentUsers--;
 					break;
 				case REQ:
-					fprintf(fp, "Master has detected Process P%2d requesting R%2d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
+					fprintf(fp, "Master has detected Process P%d requesting R%d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
+					allocate(P[procNum], msgData);
 					break;
 				case REL:
-					fprintf(fp, "Master has detected Process P%2d releasing R%2d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
+					fprintf(fp, "Master has detected Process P%d releasing R%d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
 					break;
 
 			}
@@ -180,11 +183,11 @@ void outputTable() {
 		if (procNum < 0) {
 			printf("\t");
 			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
-				printf("R%2d\t", rsrcNum);
+				printf("R%d\t", rsrcNum);
 			}
 		}
 		else {
-			printf("P%2d\t", procNum);
+			printf("P%d\t", procNum);
 			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
 				printf("%d\t", (procNum * SIZE + rsrcNum));
 			}
