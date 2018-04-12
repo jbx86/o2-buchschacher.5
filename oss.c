@@ -7,7 +7,14 @@ int semid;	// Semaphore ID
 int descid;	// Resource description ID
 FILE *fp;	// Log file
 
+message_buf buf;	// Message content
+size_t buf_length;	// Message length
+
 void outputTable();
+void allocate(int, pid_t);
+void block(pid_t);
+void unblock(pid_t);
+
 
 void handler(int signo) {
 	printf("OSS: Terminating by signal\n");
@@ -19,6 +26,7 @@ void handler(int signo) {
 }
 
 int main(int argc, char *argv[]) {
+	int procNum;
 
 	// getopt() vars
 	int opt;
@@ -27,14 +35,13 @@ int main(int argc, char *argv[]) {
 	// Child tracking vars
 	int currentUsers = 0;
 	int totalUsers = 0;
-	long int ossPid = (long)getpid();
+
+	pid_t ossPid = getpid();
 	pid_t pid;
-	pid_t pidTable[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	pid_t P[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	sim_time *simClock;	// Pointer to simulated clock in shared memeory
 	resource *resDesc;	// Pointer to resource descriptor array in chared memeory
-	message_buf buf;	// Message content
-	size_t buf_length;	// Message length
 
 	// Parse command line options:
 	while ((opt = getopt(argc, argv, "v")) != -1) {
@@ -87,7 +94,8 @@ int main(int argc, char *argv[]) {
 
 
 
-	// Infinitely repeated loop
+// Infinitely repeated loop
+
 	while(1) {
 
 		// Fork children if max has not been reached
@@ -102,29 +110,47 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "Fail to execute child process\n");
 					exit(1);
 				default :
+					// Find empty slot in pid table
+					for (procNum = 0; procNum < MAXUSERS; procNum++)
+						if (P[procNum] == 0)
+							break;
+					P[procNum] = pid;
 					totalUsers++;
 					currentUsers++;
-					printf("OSS: %d users spawned\n", totalUsers);
+					printf("Creating P%2d (PID: %ld)\n", procNum, pid);
 			}
 		}
 
 		// Handle messages from children
-		if (msgrcv(msgid, &buf, MSGSZ, ossPid, IPC_NOWAIT) != (ssize_t)-1) {
+		if (msgrcv(msgid, &buf, MSGSZ, (long)ossPid, IPC_NOWAIT) != (ssize_t)-1) {
 
 			// Parse message
 			char *ptr;
-			long int userPid = strtol(buf.mtext, &ptr, 10);
-			long int msgType = strtol(ptr, &ptr, 10);
-			long int msgData = strtol(ptr, &ptr, 10);
-			printf("Message type %ld recieved from %ld regarding %ld\n", msgType, userPid, msgData);
-			
+			pid_t userPid = (pid_t)strtol(buf.mtext, &ptr, 10);
+			int msgType = (int)strtol(ptr, &ptr, 10);
+			int msgData = (int)strtol(ptr, &ptr, 10);
+			printf("Message type %d recieved from %ld regarding %ld\n", msgType, userPid, msgData);
 
-			// Process message
+			// Determine which process sent the message
+			for (procNum = 0; procNum < MAXUSERS; procNum++)
+				if (P[procNum] == userPid)
+					break;
+
+			// Handle message
 			switch (msgType) {
-				case 0:
-					printf("OSS: %ld is terminating\n", userPid);
-					waitpid((pid_t)userPid, NULL, 0);
+				case TERM:
+					printf("P%2d is terminating\n", procNum);
+					waitpid(P[procNum], NULL, 0);
+					P[procNum] = 0;
 					currentUsers--;
+					break;
+				case REQ:
+					fprintf(fp, "Master has detected Process P%2d requesting R%2d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
+					break;
+				case REL:
+					fprintf(fp, "Master has detected Process P%2d releasing R%2d at time %d:%09d\n", procNum, msgData, simClock->sec, simClock->nano);
+					break;
+
 			}
 			// Respond to user
 
@@ -132,64 +158,14 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-
-
-/*
-	buf.mtype = 1;
-	sprintf(buf.mtext, "OSS is ready", (long)getpid());
-	buf_length = strlen(buf.mtext) + 1;
-	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
-		perror("oss: msgsnd");
-		exit(1);
-	}
-*/
-
-//	printf("buf.mtype = %d\nbuf_length = %d\nbuf_mtext = %s\n", buf.mtype, buf_length, buf.mtext);
-
-/*
-	// Repeatedly wait for a type 1 message in the queue
-	while(msgrcv(msgid, &buf, MSGSZ, 1, IPC_NOWAIT) == (ssize_t)-1) {
-		printf("OSS: No message in queue\n");
-		sleep(1);
-	}
-	printf("recieved \'%s\'\n", buf.mtext);
-*/
-
-/*	if (msgrcv(msgid, &buf, MSGSZ, 1, IPC_NOWAIT) < 0) {
-		perror("msgrcv");
-		exit(1);
-	}
-	else {
-		printf("recieved \'%s\'\n", buf.mtext);
-	}
-*/
-	//if (msgrcv(msgid, &buf
-
-/*	//Repeating loop
-	while (1) {
-		/*
-		if (currentUsers < MAXUSERS) {
-			if ((pid = fork()) == 0) {
-				execl("./user", "user", NULL);
-				fprintf(stderr, "Fail to execute child process\n");
-			}
-			else
-				printf("oss: Child %ld spawned\n" , (long)pid);
-			currentUsers++; 
+	// Kill remaining user processes
+	for (procNum = 0; procNum < MAXUSERS; procNum++)
+		if (P[procNum] != 0) {
+			kill(P[procNum], SIGKILL);
+			waitpid(P[procNum], NULL, 0);
 		}
 
-		wait(NULL);
-
-		printf("Are we waiting?\n");
-		if (msgrcv(msgid, &buf, MSGSZ, 1, 0) < 0) {
-			perror("oss: msgrcv");
-			exit(1);
-		}
-		//printf("oss: %s\n", buf.mtext);	
-		
-	}
-*/
-	printf("OSS: DONE ------------------------------------\n");
+	// Release memeory
 	shmctl(clkid, IPC_RMID, NULL);	// Release process control block memeory
 	shmctl(descid, IPC_RMID, NULL);	// Release resource description memory
 	msgctl(msgid, IPC_RMID, NULL);  // Release message queue memory
@@ -199,20 +175,53 @@ int main(int argc, char *argv[]) {
 }
 
 void outputTable() {
-	int i, j;
-	for (i = -1; i < MAXUSERS; i++) {
-		if (i < 0) {
+	int procNum, rsrcNum;
+	for (procNum = -1; procNum < MAXUSERS; procNum++) {
+		if (procNum < 0) {
 			printf("\t");
-			for (j = 0; j < SIZE; j++) {
-				printf("R%d\t", j);
+			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
+				printf("R%2d\t", rsrcNum);
 			}
 		}
 		else {
-			printf("P%02d\t", i);
-			for (j = 0; j < SIZE; j++) {
-				printf("%d\t", (i * SIZE + j));
+			printf("P%2d\t", procNum);
+			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
+				printf("%d\t", (procNum * SIZE + rsrcNum));
 			}
 		}
 		printf("\n");
+	}
+}
+
+// Allocate resource
+void allocate(int resource, pid_t userPid) {
+	buf.mtype = (long)userPid;
+	sprintf(buf.mtext, "%ld %d %d", (long)getpid(), ALC, resource);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("oss: msgsnd");
+		exit(1);
+	}
+}
+
+// Block user process
+void block(pid_t userPid) {
+	buf.mtype = (long)userPid;
+	sprintf(buf.mtext, "%ld %d %d", (long)getpid(), BLK, 0);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("oss: msgsnd");
+		exit(1);
+	}
+}
+
+// Unblock user process
+void unblock(pid_t userPid) {
+	buf.mtype = (long)userPid;
+	sprintf(buf.mtext, "%ld %d %d", (long)getpid(), UBLK, 0);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("oss: msgsnd");
+		exit(1);
 	}
 }

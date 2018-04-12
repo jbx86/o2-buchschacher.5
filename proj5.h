@@ -14,8 +14,15 @@
 #define MSGKEY 4242
 #define MSGSZ 256
 #define NPS 1000000000
-#define SIZE 20
 #define MAXUSERS 18
+#define SIZE 20
+
+#define REQ 1
+#define REL 2
+#define TERM 3
+#define ALC 4
+#define BLK 5
+#define UBLK 6
 
 typedef struct {
 	unsigned int sec;

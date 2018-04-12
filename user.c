@@ -2,19 +2,23 @@
 #include "proj5.h"
 #define RNDBND 20
 
+int msgid;              // Message queue ID
+message_buf buf;        // Message buffer
+size_t buf_length;      // Length of send message buffer
+
+void request(int);
+void release(int);
+void terminate();
+
 int main() {
 	int clkid;		// Shared memory ID of simclock
-	int msgid;		// Message queue ID
 
-	sim_time *ossClock;	// Pointer to simulated system clock
-	message_buf buf;	// Message buffer
-	size_t buf_length;	// Length of send message buffer
+	sim_time *simClock;	// Pointer to simulated system clock
 
-	long int ossPid = (long)getppid();
-	long int userPid = (long)getpid();
-	srand((time(NULL) + userPid) % UINT_MAX);
-//	printf("%ld is alive and generated %d\n", userPid, rand() % 20);
+	srand((time(NULL) + getpid()) % UINT_MAX);
 	int i;
+
+	int termFlag = 0;
 
 // Setup IPC
 
@@ -23,7 +27,7 @@ int main() {
 		perror("user: shmget clkid");
 		exit(1);
 	}
-	ossClock = shmat(clkid, NULL, 0);
+	simClock = shmat(clkid, NULL, 0);
 
 	// Locate message queue
 	if ((msgid = msgget(MSGKEY, 0666)) < 0) {
@@ -31,41 +35,74 @@ int main() {
 		exit(1);
 	}
 
+
+// Send a few random messages
+	request(1);
+	release(88);
+
+	while (termFlag == 0) {
 	
-/*
-	// Send a message to OSS
-	buf.mtype = ossPid;
-	sprintf(buf.mtext, "%ld %d", userPid, rand() % 20);
-	buf_length = strlen(buf.mtext) + 1;
-	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
-		perror("user: msgsnd");
-		exit(1);
+		// Handle messages from oss
+		if (msgrcv(msgid, &buf, MSGSZ, (long)getppid(), IPC_NOWAIT) != (ssize_t)-1) {
+
+			// Parse message
+			char *ptr;
+			pid_t userPid = (pid_t)strtol(buf.mtext, &ptr, 10);
+			int msgType = (int)strtol(ptr, &ptr, 10);
+			int msgData = (int)strtol(ptr, &ptr, 10);
+
+			// Handle message
+			switch (msgType) {
+				case ALC:
+					printf("ALC message recieved\n");
+					termFlag = 1;
+					break;
+				case BLK:
+					printf("BLK message recieved\n");
+					break;
+				case UBLK:
+					printf("UBLK message recieved\n");
+					break;
+				}
+				// Respond to user
+
+
+			}
 	}
-
-/*
-	// Wait for responce from OSS
-	if (msgrcv(msgid, &buf, MSGSZ, userPid, 0) < 0) {
-		perror("user: msgrcv");
-		exit(1);
-	}
-
-	printf("%ld is terminating\n", userPid);
-*/
-
-// User 
-
-	// Release resources
-
-	// Tell OSS this process is terminating
-	buf.mtype = ossPid;
-	sprintf(buf.mtext, "%ld %d %d", userPid, 0, 0);
-	buf_length = strlen(buf.mtext) + 1;
-	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
-		perror("user: msgsnd");
-		exit(1);
-	}
-
-
-
+	
+	terminate();
 	exit(0);
+}
+
+// Request resource
+void request(int resource) {
+	buf.mtype = (long)getppid();
+	sprintf(buf.mtext, "%ld %d %d", (long)getpid(), REQ, resource);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("user: msgsnd");
+		exit(1);
+	}
+}
+
+// Release resource
+void release(int resource) {
+	buf.mtype = (long)getppid();
+	sprintf(buf.mtext, "%ld %d %d", (long)getpid(), REL, resource);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("user: msgsnd");
+		exit(1);
+	}
+}
+
+// Signal oss that user is terminating
+void terminate() {
+	buf.mtype = (long)getppid();
+	sprintf(buf.mtext, "%ld %d 0", (long)getpid(), TERM);
+	buf_length = strlen(buf.mtext) + 1;
+	if (msgsnd(msgid, &buf, buf_length, 0) < 0) {
+		perror("user: msgsnd");
+		exit(1);
+	}
 }
