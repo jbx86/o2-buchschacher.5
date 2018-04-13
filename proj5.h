@@ -37,6 +37,7 @@ typedef struct msgbuf {
 typedef struct {
 	int C[MAXUSERS];
 	int A[MAXUSERS];
+	int CA[MAXUSERS];
 	int R;
 	int V;
 } descriptor;

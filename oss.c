@@ -76,6 +76,7 @@ int main(int argc, char *argv[]) {
 		for (p = 0; p < MAXUSERS; p++) {
 			Res[r].C[p] = 0;
 			Res[r].A[p] = 0;
+			Res[r].CA[p] = 0;
 		}
 	}
 
@@ -292,11 +293,23 @@ void outputTable(pid_t P[], descriptor R[]) {
 
 // Run banker's algorithm
 int banker(descriptor R[], r, p) {
-	int i;
+	int i, j;
+	int safe = 0;	// 0 if not in a safe state
+	int canrun = 0;	// 0 if no process can run
 
-	// Don't allow a request for more resources of that type than are in the system
-	if (R[r].C[p] == R[r].R)
-		return 0;
+	// Update C-A table
+	for (i = 0; i < MAXUSERS; i++) {
+		for (j = 0; j < SIZE; j++) {
+			R[i].CA[j] = R[i].C[j] - R[i].A[j]
+		}
+	}
+
+	// Check if the system is in a safe state, but finding a process that can run
+	for (i = 0; i < MAXUSERS; i++) {
+		for (j = 0; j < SIZE; j++) {
+			
+		}
+	}
 
 }
 
