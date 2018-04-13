@@ -15,7 +15,7 @@
 #define MSGSZ 256
 #define NPS 1000000000
 #define MAXUSERS 5
-#define SIZE 20
+#define SIZE 7
 
 #define REQ 1
 #define REL 2
@@ -29,16 +29,17 @@ typedef struct {
 	unsigned int nano;
 } sim_time;
 
-typedef struct {
-	int type;
-	int instances;
-	int allocated;	
-} resource;
-
 typedef struct msgbuf {
 	long mtype;
 	char mtext[MSGSZ];
 } message_buf;
+
+typedef struct {
+	int C[MAXUSERS];
+	int A[MAXUSERS];
+	int R;
+	int V;
+} descriptor;
 
 // Add a number of nanoseconds to a sim_time
 void simadd(sim_time *time, unsigned int incSec, unsigned int incNano) {

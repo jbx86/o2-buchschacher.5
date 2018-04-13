@@ -1,1 +1,4 @@
-This is a readme file
+As of writing this readme file I don't expect to have a final program. While
+developing the program I repeatedly encountered segmentation fault errors that
+I was unable to determine the source of, which made testing the other functions
+(i.e. deadlock prevention alogrithm) nearly impossible.

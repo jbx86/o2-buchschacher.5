@@ -10,7 +10,7 @@ FILE *fp;	// Log file
 message_buf buf;	// Message content
 size_t buf_length;	// Message length
 
-void outputTable(pid_t[], descriptor[]);
+void outputTable();
 void pidTable(pid_t[]);
 void allocate(int, pid_t);
 void block(pid_t);
@@ -27,12 +27,24 @@ void handler(int signo) {
 }
 
 int main(int argc, char *argv[]) {
-	int p, r;
-	int opt, vflag;
-	int currentUsers = 0;
-	pid_t Proc[MAXUSERS];
+	int procNum;	// Process number
+	int rsrcNum;	// Resource number
+	int logWrite = 0;
 
-	srand(time(NULL));
+	// getopt() vars
+	int opt;
+	int vflag;
+	
+	// Child tracking vars
+	int currentUsers = 0;
+	int totalUsers = 0;
+
+	//pid_t ossPid = getpid();
+	pid_t pid;
+	pid_t P[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+	sim_time *simClock;	// Pointer to simulated clock in shared memeory
+	descriptor *R;	// Pointer to resource descriptor array in chared memeory
 
 	// Parse command line options:
 	while ((opt = getopt(argc, argv, "v")) != -1) {
@@ -45,10 +57,13 @@ int main(int argc, char *argv[]) {
 				vflag = 0;
 		}
 	}
+	if (vflag) {
+		outputTable();
+	}
 
 	signal(SIGINT, handler);	// Catch interupt signal
 	signal(SIGALRM, handler);	// Catch alarm signal
-	alarm(5);			// Send alarm signal
+	alarm(5);			// Send alarm signal after 2 seconds of realtime
 
 	// Open log file for output
 	fp = fopen("data.log", "w");
@@ -57,36 +72,29 @@ int main(int argc, char *argv[]) {
 		raise(SIGINT);
 	}
 
-	// Initialize child process table
-	for (p = 0; p < MAXUSERS; p++) {
-		Proc[p] = 0;
-	}
-
-	// Initialize resource descriptors in shared memory
-	if ((descid = shmget(DESCKEY, SIZE*sizeof(descriptor), IPC_CREAT | 0666)) < 0) {
-		perror("oss: shmget");
-		raise(SIGINT);
-	}
-	descriptor *Res = shmat(descid, NULL, 0);
-	for (r = 0; r < SIZE; r++) {
-		// Generate random number (1-10) of instances
-		int inst = (rand() % 10) + 1;
-		Res[r].R = inst;
-		Res[r].V = inst;
-		for (p = 0; p < MAXUSERS; p++) {
-			Res[r].C[p] = 0;
-			Res[r].A[p] = 0;
-		}
-	}
-
-	// Initialize clock in shared memory
+	// Create clock in shared memory
 	if ((clkid = shmget(CLKKEY, sizeof(sim_time), IPC_CREAT | 0666)) < 0 ) {
 		perror("oss: shmget");
 		raise(SIGINT);
 	}
-	sim_time *simClock = shmat(clkid, NULL, 0);
+	simClock = shmat(clkid, NULL, 0);
 	simClock->sec = 0;
 	simClock->nano = 0;
+
+	// Create resource descriptors in shared
+	if ((descid = shmget(DESCKEY, SIZE*sizeof(descriptor), IPC_CREAT | 0666)) < 0) {
+		perror("oss: shmget");
+		raise(SIGINT);
+	}
+	R = shmat(descid, NULL, 0);
+	R[0].resourceVec = 0;
+	R[0].alloc[0] = 1;
+	int i, j;
+	for (i = 0; i < SIZE; i++) {
+		for (j = 0; j < MAXUSERS; j++) {
+			R[i].alloc[procNum] = 0;
+		}
+	}
 
 	// Create message queue
 	if ((msgid = msgget(MSGKEY, IPC_CREAT | 0666)) < 0) {
@@ -94,100 +102,12 @@ int main(int argc, char *argv[]) {
 		raise(SIGINT);
 	}
 
-	// Lets try to out put it
-	if (vflag)
-		outputTable(Proc, Res);
+	outputTable();
+	//exit(0);
 
-//-------------------
-
-	while(1) {
-
-		/*
-		// Fork children if max has not been reached
-		if (currentUsers < MAXUSERS) {
-			pid = fork();
-			switch (pid) {
-				case -1 :
-					printf("Could not spawn child\n");
-					break;
-				case 0 :
-					execl("./user", "user", NULL);
-					fprintf(stderr, "Fail to execute child process\n");
-					exit(1);
-				default :
-					// Find empty slot in pid table
-					for (procNum = 0; procNum < MAXUSERS; procNum++)
-						if (P[procNum] == 0)
-							break;
-					P[procNum] = pid;
-					totalUsers++;
-					currentUsers++;
-					printf("Creating P%d (PID: %ld)\n", procNum, pid);
-					pidTable(P);
-
-			}
-		}
-		*/
-
-		// Handle messages from children
-		if (msgrcv(msgid, &buf, MSGSZ, (long)getpid(), IPC_NOWAIT) != (ssize_t)-1) {
-
-			// Parse message
-			char *ptr;
-			pid_t userPid = (pid_t)strtol(buf.mtext, &ptr, 10);
-			int msgType = (int)strtol(ptr, &ptr, 10);
-			r = (int)strtol(ptr, &ptr, 10);
-			printf("Message type %d recieved from %ld regarding %ld\n", msgType, userPid, r);
-
-			// Determine which process sent the message
-			for (p = 0; p < MAXUSERS; p++)
-				if (Proc[p] == userPid)
-					break;
-			if (p == 18) {
-				fprintf(stderr, "oss: no such pid in table\n");
-				exit(1);
-			}
-
-			// Handle message
-			switch (msgType) {
-				case TERM:
-					waitpid(Proc[p], NULL, 0);
-					Proc[p] = 0;
-					pidTable(Proc);
-					currentUsers--;
-					break;
-				case REQ:
-					fprintf(fp, "Master has detected Process P%d requesting R%d at time %d:%09d\n", p, r, simClock->sec, simClock->nano);
-					allocate(Proc[p], r);
-					break;
-				case REL:
-					Res[r].V++;
-					Res[r].C[p]--;
-					Res[r].A[p]--;
-					break;
-
-			}
-			// Respond to user
-
-
-		}
-	}
-
-
-//-------------------
-
-
-	// Cleanup
-	shmctl(clkid, IPC_RMID, NULL);	// Release process control block memeory
-	shmctl(descid, IPC_RMID, NULL);	// Release resource description memory
-	msgctl(msgid, IPC_RMID, NULL);  // Release message queue memory
-	fclose(fp);
-
-	exit(0);
-}
 
 // Infinitely repeated loop
-/*
+
 	while(totalUsers < 30) {
 
 		// Fork children if max has not been reached
@@ -253,51 +173,45 @@ int main(int argc, char *argv[]) {
 
 		}
 	}
-*/
-/*
-	// Kill remaining user processes
-	for (p = 0; p < MAXUSERS; p++)
-		if (P[p] != 0) {
-			kill(P[p], SIGKILL);
-			waitpid(P[p], NULL, 0);
-		}
-*/
-	// Release memeory
 
-//	exit(0);
-//}
+	// Kill remaining user processes
+	for (procNum = 0; procNum < MAXUSERS; procNum++)
+		if (P[procNum] != 0) {
+			kill(P[procNum], SIGKILL);
+			waitpid(P[procNum], NULL, 0);
+		}
+
+	// Release memeory
+	shmctl(clkid, IPC_RMID, NULL);	// Release process control block memeory
+	shmctl(descid, IPC_RMID, NULL);	// Release resource description memory
+	msgctl(msgid, IPC_RMID, NULL);  // Release message queue memory
+	fclose(fp);
+
+	exit(0);
+}
 
 
 // Write formated table to log file
-void outputTable(pid_t P[], descriptor R[]) {
-	int p, r;
-	for (p = -1; p < MAXUSERS; p++) {
+void outputTable() {
+	int procNum, rsrcNum;
+	for (procNum = -1; procNum < MAXUSERS; procNum++) {
 
-		if (p < 0) {
+		if (procNum < 0) {
 			fprintf(fp, "\t");
-			for (r = 0; r < SIZE; r++) {
-				fprintf(fp, "R%d\t", r);
+			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
+				fprintf(fp, "R%d\t", rsrcNum);
 			}
 		}
 		else {
-			fprintf(fp, "P%d\t", p);
-			for (r = 0; r < SIZE; r++) {	
-				fprintf(fp, "%d\t", R[r].A[p]);
+			fprintf(fp, "P%d\t", procNum);
+			for (rsrcNum = 0; rsrcNum < SIZE; rsrcNum++) {
+				//fprintf(fp, "%d\t", (procNum * SIZE + rsrcNum));
+				fprintf(fp, "%d\t", 0);
 			}
 		}
 	
 		fprintf(fp, "\n");
 	}
-}
-
-// Run banker's algorithm
-int banker(descriptor R[], r, p) {
-	int i;
-
-	// Don't allow a request for more resources of that type than are in the system
-	if (R[r].C[p] == R[r].R)
-		return 0;
-
 }
 
 // Allocate resource
